@@ -1,0 +1,243 @@
+{
+  "info": {
+    "name": "Product Portfolio - Observability Demo",
+    "description": "API collection for testing the Product API microservice with observability features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "API Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the API is healthy"
+          },
+          "response": []
+        },
+        {
+          "name": "API Ready Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ready",
+              "host": ["{{base_url}}"],
+              "path": ["ready"]
+            },
+            "description": "Check if the API and its dependencies are ready"
+          },
+          "response": []
+        },
+        {
+          "name": "Consumer Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{consumer_url}}/health",
+              "host": ["{{consumer_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the consumer is healthy"
+          },
+          "response": []
+        },
+        {
+          "name": "Consumer Ready Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{consumer_url}}/ready",
+              "host": ["{{consumer_url}}"],
+              "path": ["ready"]
+            },
+            "description": "Check if the consumer and its dependencies (PostgreSQL, Kafka) are ready"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Create Product - Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('correlation_id', 'postman-' + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlation_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"High-Performance Laptop\",\n  \"price\": 1299.99,\n  \"description\": \"Latest generation laptop with 16GB RAM and 512GB SSD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Create a new product successfully"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product - Missing Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 99.99,\n  \"description\": \"Missing name field\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Test validation - missing required name field"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product - Invalid Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Product\",\n  \"price\": -50.00,\n  \"description\": \"Negative price\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Test validation - negative price"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product - Name Too Short",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AB\",\n  \"price\": 99.99,\n  \"description\": \"Name is too short (min 3 chars)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Test validation - name too short"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chaos Testing",
+      "item": [
+        {
+          "name": "Create Product - With Chaos Enabled",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('correlation_id', 'chaos-' + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{correlation_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Chaos Test Product\",\n  \"price\": 99.99,\n  \"description\": \"This request might fail due to chaos injection\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/products",
+              "host": ["{{base_url}}"],
+              "path": ["products"]
+            },
+            "description": "Create product with chaos engineering enabled (might fail with 500/503/429 or have added latency)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "consumer_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "correlation_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
