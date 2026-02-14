@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS observability.traces (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (service_name, operation_name, timestamp)
-TTL timestamp + INTERVAL 30 DAY
+TTL toDateTime(timestamp) + INTERVAL 30 DAY
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS observability.logs (
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS observability.logs (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (service_name, severity, timestamp)
-TTL timestamp + INTERVAL 30 DAY
+TTL toDateTime(timestamp) + INTERVAL 30 DAY
 SETTINGS index_granularity = 8192;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS observability.traces_metrics_mv
