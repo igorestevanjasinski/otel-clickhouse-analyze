@@ -107,6 +107,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    ports:
+      - "${PRODUCT_CONSUMER_PORT:-8081}:8081"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       KAFKA_TOPIC_PRODUCTS: ${KAFKA_TOPIC_PRODUCTS:-products.events}

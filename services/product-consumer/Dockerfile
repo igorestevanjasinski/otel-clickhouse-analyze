@@ -29,6 +29,6 @@ ENV TZ=UTC
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD pgrep -f consumer || exit 1
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["./consumer"]

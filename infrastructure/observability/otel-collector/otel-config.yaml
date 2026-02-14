@@ -30,10 +30,10 @@ service:
       processors: [resource, batch]
       exporters: [debug]
     
-    metrics:
-      receivers: [otlp]
-      processors: [resource, batch]
-      exporters: [debug]
+    #metrics:
+    #  receivers: [otlp]
+    #  processors: [resource, batch]
+    #  exporters: [debug]
     
     logs:
       receivers: [otlp]
