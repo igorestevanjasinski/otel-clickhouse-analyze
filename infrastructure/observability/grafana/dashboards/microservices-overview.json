@@ -1,0 +1,225 @@
+{
+  "dashboard": {
+    "title": "Microservices Overview - RED Metrics",
+    "uid": "microservices-overview",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate (RPS) - Product API",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(products_created_total[5m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "requests/sec", "format": "reqps"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Error Rate (%) - Product API",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "100 * sum(rate(products_created_total{status=\"error\"}[5m])) / sum(rate(products_created_total[5m]))",
+            "legendFormat": "Error Rate",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "percent", "format": "percent", "max": 100},
+          {"show": false}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [5], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "name": "High Error Rate Alert"
+        }
+      },
+      {
+        "id": 3,
+        "title": "P95 Latency - Product API",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(product_creation_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(product_creation_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(product_creation_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"label": "seconds", "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Active Requests - Product API",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(active_requests)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Total Requests - Product API",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(products_created_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Message Processing Rate - Consumer",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(messages_consumed_total[5m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "messages/sec", "format": "reqps"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Consumer Processing Latency",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(message_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(message_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"label": "seconds", "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Database Operations",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(rate(database_operations_total[5m])) by (operation, status)",
+            "legendFormat": "{{operation}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "ops/sec", "format": "ops"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Database Operation Latency",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(database_operation_duration_seconds_bucket[5m])) by (le, operation))",
+            "legendFormat": "P95 - {{operation}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "seconds", "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Messages In Flight",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "messages_in_flight",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 11,
+        "title": "Kafka Messages Published",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 32},
+        "targets": [
+          {
+            "expr": "sum(kafka_messages_published_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      }
+    ]
+  }
+}

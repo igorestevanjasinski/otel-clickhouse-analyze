@@ -1,0 +1,140 @@
+{
+  "dashboard": {
+    "title": "Distributed Tracing - ClickHouse",
+    "uid": "clickhouse-traces",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "1m",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Trace Count by Service",
+        "type": "piechart",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "query": "SELECT ServiceName, count() as count FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY ServiceName",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Top 10 Slowest Operations",
+        "type": "table",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "query": "SELECT ServiceName, SpanName, quantile(0.99)(Duration) / 1000000 as p99_ms FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY ServiceName, SpanName ORDER BY p99_ms DESC LIMIT 10",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Request Rate per Service",
+        "type": "graph",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "query": "SELECT toStartOfMinute(Timestamp) as time, ServiceName, count() / 60 as rps FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY time, ServiceName ORDER BY time",
+            "format": "time_series",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "requests/sec", "format": "reqps"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Error Rate by Service",
+        "type": "graph",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "query": "SELECT toStartOfMinute(Timestamp) as time, ServiceName, countIf(StatusCode = 'STATUS_CODE_ERROR') * 100.0 / count() as error_rate FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY time, ServiceName ORDER BY time",
+            "format": "time_series",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "percent", "format": "percent", "max": 100},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Latency Heatmap",
+        "type": "heatmap",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "query": "SELECT toStartOfMinute(Timestamp) as time, Duration / 1000000 as duration_ms FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR ORDER BY time",
+            "format": "time_series",
+            "refId": "A"
+          }
+        ],
+        "dataFormat": "tsbuckets"
+      },
+      {
+        "id": 6,
+        "title": "Distributed Traces (Multi-Service)",
+        "type": "table",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "query": "SELECT TraceId, groupArray(ServiceName) as services, count() as span_count, max(Duration) / 1000000 as total_duration_ms, countIf(StatusCode = 'STATUS_CODE_ERROR') as errors FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY TraceId HAVING length(services) > 1 ORDER BY total_duration_ms DESC LIMIT 20",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "P50/P95/P99 Latency by Service",
+        "type": "graph",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 34},
+        "targets": [
+          {
+            "query": "SELECT toStartOfMinute(Timestamp) as time, ServiceName, quantile(0.50)(Duration) / 1000000 as p50, quantile(0.95)(Duration) / 1000000 as p95, quantile(0.99)(Duration) / 1000000 as p99 FROM observability.traces WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY time, ServiceName ORDER BY time",
+            "format": "time_series",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"label": "milliseconds", "format": "ms"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Recent Errors",
+        "type": "table",
+        "datasource": "ClickHouse",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 34},
+        "targets": [
+          {
+            "query": "SELECT Timestamp, TraceId, ServiceName, SpanName, StatusCode FROM observability.traces WHERE StatusCode = 'STATUS_CODE_ERROR' AND Timestamp >= now() - INTERVAL 1 HOUR ORDER BY Timestamp DESC LIMIT 50",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  }
+}

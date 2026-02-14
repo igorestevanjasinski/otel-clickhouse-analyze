@@ -176,6 +176,56 @@ services:
         soft: 262144
         hard: 262144
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./infrastructure/observability/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - kafka-network
+      - db-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource
+    ports:
+      - "3000:3000"
+    networks:
+      - kafka-network
+      - db-network
+    depends_on:
+      - prometheus
+      - clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
 networks:
   kafka-network:
     driver: bridge
@@ -186,4 +236,8 @@ volumes:
   postgres_data:
     driver: local
   clickhouse_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

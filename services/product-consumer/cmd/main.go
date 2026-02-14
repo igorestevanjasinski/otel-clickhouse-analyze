@@ -11,6 +11,7 @@ import (
 	"github.com/igor-jasinski/product-consumer/internal/consumer"
 	"github.com/igor-jasinski/product-consumer/internal/health"
 	"github.com/igor-jasinski/product-consumer/internal/repository"
+	"github.com/igor-jasinski/product-consumer/pkg/metrics"
 	"github.com/igor-jasinski/product-consumer/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 )
@@ -54,6 +55,10 @@ func main() {
 }
 
 func run(ctx context.Context, cfg *config.Config) error {
+	metrics.Init()
+	metrics.StartServer("8081")
+	log.Info("Prometheus metrics server started on :8081")
+
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{
 		ServiceName:    "product-consumer",
 		ServiceVersion: "1.0.0",

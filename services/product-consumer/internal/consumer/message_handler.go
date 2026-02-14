@@ -9,6 +9,7 @@ import (
 
 	"github.com/igor-jasinski/product-consumer/internal/models"
 	"github.com/igor-jasinski/product-consumer/internal/repository"
+	"github.com/igor-jasinski/product-consumer/pkg/metrics"
 	"github.com/igor-jasinski/product-consumer/pkg/telemetry"
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
@@ -76,6 +77,15 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		"trace_id":       traceID,
 	})
 
+	metrics.InFlightMessages.Inc()
+	defer metrics.InFlightMessages.Dec()
+
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.ProcessingDuration.WithLabelValues(msg.Topic).Observe(duration)
+	}()
+
 	if telemetry.AppMetrics != nil {
 		telemetry.AppMetrics.MessagesInFlight.Add(ctx, 1)
 		defer telemetry.AppMetrics.MessagesInFlight.Add(ctx, -1)
@@ -94,6 +104,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Chaos error injected")
 		log.WithError(err).Error("Chaos error injected, skipping message processing")
+		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
 		if telemetry.AppMetrics != nil {
 			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
 		}
@@ -106,6 +117,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.SetStatus(codes.Error, "Deserialization failed")
 		log.WithError(err).Error("Failed to deserialize message")
 		h.handleDeserializationError(ctx, msg, correlationID)
+		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
 		if telemetry.AppMetrics != nil {
 			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
 		}
@@ -117,6 +129,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.SetStatus(codes.Error, "Validation failed")
 		log.WithError(err).Error("Invalid product data")
 		h.handleDeserializationError(ctx, msg, correlationID)
+		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
 		if telemetry.AppMetrics != nil {
 			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
 		}
@@ -138,6 +151,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 	if err := h.createProductWithRetry(ctx, &product, log); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to persist product")
+		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
 		if telemetry.AppMetrics != nil {
 			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
 		}
@@ -146,6 +160,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 
 	span.SetStatus(codes.Ok, "Product persisted successfully")
 	log.WithField("product_id", product.ID).Info("Product persisted successfully")
+	metrics.MessagesConsumed.WithLabelValues(msg.Topic, "success").Inc()
 	return nil
 }
 

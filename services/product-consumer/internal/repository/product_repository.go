@@ -8,6 +8,7 @@ import (
 
 	"github.com/igor-jasinski/product-consumer/internal/config"
 	"github.com/igor-jasinski/product-consumer/internal/models"
+	"github.com/igor-jasinski/product-consumer/pkg/metrics"
 	"github.com/igor-jasinski/product-consumer/pkg/telemetry"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,6 +106,8 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	duration := time.Since(start)
 
+	metrics.DatabaseOperationDuration.WithLabelValues("insert").Observe(duration.Seconds())
+
 	if telemetry.AppMetrics != nil {
 		telemetry.AppMetrics.DatabaseOperations.Add(ctx, 1,
 			metric.WithAttributes(
@@ -117,6 +120,7 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to insert product")
+		metrics.DatabaseOperations.WithLabelValues("insert", "error").Inc()
 		r.log.WithFields(logrus.Fields{
 			"product_id": product.ID,
 			"error":      err.Error(),
@@ -129,6 +133,7 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	if rowsAffected == 0 {
 		span.AddEvent("Product already exists")
+		metrics.DatabaseOperations.WithLabelValues("insert", "duplicate").Inc()
 		r.log.WithFields(logrus.Fields{
 			"product_id": product.ID,
 			"duration":   duration.Milliseconds(),
@@ -138,6 +143,7 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	span.SetStatus(codes.Ok, "Product created successfully")
 	span.SetAttributes(attribute.Int64("db.rows_affected", rowsAffected))
+	metrics.DatabaseOperations.WithLabelValues("insert", "success").Inc()
 
 	r.log.WithFields(logrus.Fields{
 		"product_id":   product.ID,

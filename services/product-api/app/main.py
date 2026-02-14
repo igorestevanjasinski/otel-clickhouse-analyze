@@ -12,6 +12,7 @@ from app.middleware.error_injection import ErrorInjectionMiddleware
 from app.middleware.latency_injection import LatencyInjectionMiddleware
 from app.telemetry.tracing import setup_tracing, get_current_trace_id
 from app.telemetry.metrics import app_metrics
+from app.telemetry.prometheus_metrics import metrics_app
 
 
 def setup_logging() -> None:
@@ -129,6 +130,8 @@ def create_application() -> FastAPI:
         )
     
     app.include_router(products_router, tags=["products"])
+    
+    app.mount("/metrics", metrics_app)
     
     return app
 

@@ -46,6 +46,8 @@ docker-compose.override.yml
 volumes/
 clickhouse_data/
 postgres_data/
+prometheus_data/
+grafana_data/
 
 # IDE
 .vscode/

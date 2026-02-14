@@ -1,8 +1,10 @@
 from datetime import datetime
 from uuid import uuid4
+import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models import ProductCreate, ProductResponse
 from app.services import KafkaProducerService
+from app.telemetry.prometheus_metrics import REQUEST_COUNT, REQUEST_LATENCY, ACTIVE_REQUESTS
 import logging
 
 router = APIRouter()
@@ -33,6 +35,9 @@ async def create_product(
     product: ProductCreate,
     kafka_producer: KafkaProducerService = Depends(get_kafka_producer)
 ) -> ProductResponse:
+    start_time = time.time()
+    ACTIVE_REQUESTS.labels(endpoint="/products").inc()
+    
     correlation_id = str(uuid4())
     product_id = uuid4()
     
@@ -73,6 +78,9 @@ async def create_product(
                     "product_id": str(product_id)
                 }
             )
+            REQUEST_COUNT.labels(status="error", endpoint="/products").inc()
+            REQUEST_LATENCY.labels(endpoint="/products").observe(time.time() - start_time)
+            ACTIVE_REQUESTS.labels(endpoint="/products").dec()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to publish product event"
@@ -86,9 +94,14 @@ async def create_product(
             }
         )
         
+        REQUEST_COUNT.labels(status="success", endpoint="/products").inc()
+        REQUEST_LATENCY.labels(endpoint="/products").observe(time.time() - start_time)
+        ACTIVE_REQUESTS.labels(endpoint="/products").dec()
+        
         return response
         
     except HTTPException:
+        ACTIVE_REQUESTS.labels(endpoint="/products").dec()
         raise
     except Exception as e:
         logger.error(
@@ -100,6 +113,9 @@ async def create_product(
             },
             exc_info=True
         )
+        REQUEST_COUNT.labels(status="error", endpoint="/products").inc()
+        REQUEST_LATENCY.labels(endpoint="/products").observe(time.time() - start_time)
+        ACTIVE_REQUESTS.labels(endpoint="/products").dec()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create product"

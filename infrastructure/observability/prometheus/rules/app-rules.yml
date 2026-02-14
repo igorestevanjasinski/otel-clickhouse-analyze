@@ -1,0 +1,36 @@
+groups:
+  - name: product_api_rules
+    interval: 30s
+    rules:
+      - record: job:product_api:requests_per_second
+        expr: rate(products_created_total[1m])
+      
+      - record: job:product_api:error_rate
+        expr: |
+          rate(products_created_total{status="error"}[5m]) 
+          / 
+          rate(products_created_total[5m])
+      
+      - record: job:product_api:latency_seconds:avg
+        expr: |
+          rate(product_creation_duration_seconds_sum[5m])
+          /
+          rate(product_creation_duration_seconds_count[5m])
+
+  - name: product_consumer_rules
+    interval: 30s
+    rules:
+      - record: job:product_consumer:messages_per_second
+        expr: rate(messages_consumed_total[1m])
+      
+      - record: job:product_consumer:error_rate
+        expr: |
+          rate(messages_consumed_total{status="error"}[5m])
+          /
+          rate(messages_consumed_total[5m])
+      
+      - record: job:product_consumer:processing_seconds:avg
+        expr: |
+          rate(message_processing_duration_seconds_sum[5m])
+          /
+          rate(message_processing_duration_seconds_count[5m])
