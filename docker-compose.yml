@@ -139,10 +139,41 @@ services:
       - "4318:4318"   # OTLP HTTP receiver
       - "8888:8888"   # Prometheus metrics exposed by the collector
       - "13133:13133" # health_check extension
+    depends_on:
+      clickhouse:
+        condition: service_healthy
     networks:
       - kafka-network
       - db-network
     restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1-alpine
+    container_name: clickhouse
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP interface
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./infrastructure/observability/clickhouse/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    environment:
+      CLICKHOUSE_DB: observability
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    networks:
+      - db-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
 
 networks:
   kafka-network:
@@ -152,4 +183,6 @@ networks:
 
 volumes:
   postgres_data:
+    driver: local
+  clickhouse_data:
     driver: local
