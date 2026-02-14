@@ -156,6 +156,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./infrastructure/observability/clickhouse/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./infrastructure/observability/clickhouse/config.xml:/etc/clickhouse-server/config.d/network.xml
     environment:
       CLICKHOUSE_DB: observability
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
