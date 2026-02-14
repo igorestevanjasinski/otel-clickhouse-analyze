@@ -44,21 +44,6 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger = logging.getLogger(__name__)
     
-    setup_tracing(
-        app=app,
-        service_name=settings.app_name,
-        service_version=settings.app_version,
-        environment=settings.environment,
-        otlp_endpoint=settings.otlp_endpoint
-    )
-    
-    app_metrics.setup(
-        service_name=settings.app_name,
-        service_version=settings.app_version,
-        environment=settings.environment,
-        otlp_endpoint=settings.otlp_endpoint
-    )
-    
     logger.info(
         "Application starting",
         extra={
@@ -98,6 +83,21 @@ def create_application() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan
+    )
+    
+    setup_tracing(
+        app=app,
+        service_name=settings.app_name,
+        service_version=settings.app_version,
+        environment=settings.environment,
+        otlp_endpoint=settings.otlp_endpoint
+    )
+    
+    app_metrics.setup(
+        service_name=settings.app_name,
+        service_version=settings.app_version,
+        environment=settings.environment,
+        otlp_endpoint=settings.otlp_endpoint
     )
     
     app.add_middleware(
