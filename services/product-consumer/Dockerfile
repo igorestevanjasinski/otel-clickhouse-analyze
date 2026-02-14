@@ -1,3 +1,16 @@
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . . 
+
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \ 
+    -ldflags '-extldflags "-static"' \
+    -o consumer cmd/main.go
+
 FROM alpine:latest
 
 RUN addgroup -g 1000 appuser && \
@@ -5,7 +18,7 @@ RUN addgroup -g 1000 appuser && \
 
 WORKDIR /app
 
-COPY bin/consumer .
+COPY --from=builder /app/consumer .
 
 RUN chown -R appuser:appuser /app
 

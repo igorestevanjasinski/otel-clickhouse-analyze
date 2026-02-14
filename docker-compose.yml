@@ -76,8 +76,6 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      otel-collector:
-        condition: service_healthy
     ports:
       - "${PRODUCT_API_PORT:-8000}:8000"
     environment:
@@ -109,8 +107,6 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      otel-collector:
-        condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       KAFKA_TOPIC_PRODUCTS: ${KAFKA_TOPIC_PRODUCTS:-products.events}
@@ -131,7 +127,7 @@ services:
     restart: unless-stopped
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.93.0
+    image: otel/opentelemetry-collector-contrib:0.106.0
     container_name: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
@@ -145,12 +141,6 @@ services:
       - kafka-network
       - db-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
 networks:
   kafka-network:
