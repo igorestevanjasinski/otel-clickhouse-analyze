@@ -92,6 +92,26 @@ func run(ctx context.Context, cfg *config.Config) error {
 		}
 	}()
 
+	// Setup logging to send logs to OpenTelemetry Collector
+	shutdownLogging, err := telemetry.SetupLogging(telemetry.LoggingConfig{
+		ServiceName:    "product-consumer",
+		ServiceVersion: "1.0.0",
+		Environment:    cfg.App.Environment,
+		OTLPEndpoint:   cfg.OpenTelemetry.Endpoint,
+	})
+	if err != nil {
+		log.WithError(err).Warn("Failed to setup logging, continuing without OTLP log export")
+	} else {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownLogging(shutdownCtx); err != nil {
+				log.WithError(err).Error("Failed to shutdown logging")
+			}
+		}()
+		log.Info("OpenTelemetry logging initialized")
+	}
+
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{
 		ServiceName:    "product-consumer",
 		ServiceVersion: "1.0.0",

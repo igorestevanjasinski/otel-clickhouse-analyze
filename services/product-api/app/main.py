@@ -11,6 +11,7 @@ from app.services import KafkaProducerService
 from app.middleware.error_injection import ErrorInjectionMiddleware
 from app.middleware.latency_injection import LatencyInjectionMiddleware
 from app.telemetry.tracing import setup_tracing, get_current_trace_id
+from app.telemetry.logging import setup_logging as setup_otel_logging
 from app.telemetry.prometheus_metrics import metrics_app
 
 
@@ -75,6 +76,14 @@ async def lifespan(app: FastAPI):
 def create_application() -> FastAPI:
     setup_logging()
     settings = get_settings()
+    
+    # Configurar envio de logs para OpenTelemetry Collector
+    setup_otel_logging(
+        service_name=settings.app_name,
+        service_version=settings.app_version,
+        environment=settings.environment,
+        otlp_endpoint=settings.otlp_endpoint
+    )
     
     app = FastAPI(
         title=settings.app_name,
