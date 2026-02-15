@@ -58,6 +58,40 @@ func main() {
 func run(ctx context.Context, cfg *config.Config) error {
 	metrics.Init()
 
+	// Criar servidor HTTP primeiro para garantir que endpoints estejam disponíveis
+	// mesmo se houver problemas com dependências (Kafka/PostgreSQL)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.GetHandler())
+
+	// Health check simples que sempre responde
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy"}`))
+	})
+
+	server := &http.Server{
+		Addr:         ":8081",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		log.Info("HTTP server started on :8081 (metrics: /metrics, health: /health, ready: /ready)")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Error("HTTP server failed")
+		}
+	}()
+
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.WithError(err).Error("Failed to shutdown HTTP server")
+		}
+	}()
+
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{
 		ServiceName:    "product-consumer",
 		ServiceVersion: "1.0.0",
@@ -86,36 +120,9 @@ func run(ctx context.Context, cfg *config.Config) error {
 		}
 	}()
 
-	// Criar health checker para endpoints de saúde
+	// Agora que temos o repo, criar health checker completo e adicionar /ready endpoint
 	healthChecker := health.NewHealthChecker(repo, cfg.Kafka.Brokers, log)
-
-	// Atualizar servidor HTTP para incluir health checks completos
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.GetHandler())
-	mux.HandleFunc("/health", healthChecker.HealthHandler)
 	mux.HandleFunc("/ready", healthChecker.ReadyHandler)
-
-	server := &http.Server{
-		Addr:         ":8081",
-		Handler:      mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
-
-	go func() {
-		log.Info("HTTP server started on :8081 (metrics: /metrics, health: /health, ready: /ready)")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Error("HTTP server failed")
-		}
-	}()
-
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.WithError(err).Error("Failed to shutdown HTTP server")
-		}
-	}()
 
 	dlqTopic := cfg.Kafka.Topic + "-dlq"
 
