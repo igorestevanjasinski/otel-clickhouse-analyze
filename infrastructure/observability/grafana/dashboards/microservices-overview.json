@@ -1,15 +1,14 @@
 {
-  "dashboard": {
-    "title": "Microservices Overview - RED Metrics",
-    "uid": "microservices-overview",
-    "timezone": "browser",
-    "schemaVersion": 16,
-    "refresh": "30s",
-    "time": {
-      "from": "now-1h",
-      "to": "now"
-    },
-    "panels": [
+  "title": "Microservices Overview - RED Metrics",
+  "uid": "microservices-overview",
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
       {
         "id": 1,
         "title": "Request Rate (RPS) - Product API",

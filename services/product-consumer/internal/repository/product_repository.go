@@ -15,7 +15,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -107,15 +106,6 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 	duration := time.Since(start)
 
 	metrics.DatabaseOperationDuration.WithLabelValues("insert").Observe(duration.Seconds())
-
-	if telemetry.AppMetrics != nil {
-		telemetry.AppMetrics.DatabaseOperations.Add(ctx, 1,
-			metric.WithAttributes(
-				attribute.String("operation", "insert"),
-				attribute.String("table", "products"),
-			),
-		)
-	}
 
 	if err != nil {
 		span.RecordError(err)

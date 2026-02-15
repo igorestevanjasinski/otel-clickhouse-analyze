@@ -86,18 +86,6 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		metrics.ProcessingDuration.WithLabelValues(msg.Topic).Observe(duration)
 	}()
 
-	if telemetry.AppMetrics != nil {
-		telemetry.AppMetrics.MessagesInFlight.Add(ctx, 1)
-		defer telemetry.AppMetrics.MessagesInFlight.Add(ctx, -1)
-
-		start := time.Now()
-		defer func() {
-			duration := time.Since(start).Seconds()
-			telemetry.AppMetrics.ProcessingDuration.Record(ctx, duration)
-			telemetry.AppMetrics.MessagesConsumed.Add(ctx, 1)
-		}()
-	}
-
 	InjectLatency(h.chaosConfig)
 
 	if err := InjectRandomError(h.chaosConfig); err != nil {
@@ -105,9 +93,6 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.SetStatus(codes.Error, "Chaos error injected")
 		log.WithError(err).Error("Chaos error injected, skipping message processing")
 		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
-		if telemetry.AppMetrics != nil {
-			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
-		}
 		return err
 	}
 
@@ -118,9 +103,6 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		log.WithError(err).Error("Failed to deserialize message")
 		h.handleDeserializationError(ctx, msg, correlationID)
 		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
-		if telemetry.AppMetrics != nil {
-			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
-		}
 		return nil
 	}
 
@@ -130,9 +112,6 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		log.WithError(err).Error("Invalid product data")
 		h.handleDeserializationError(ctx, msg, correlationID)
 		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
-		if telemetry.AppMetrics != nil {
-			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
-		}
 		return nil
 	}
 
@@ -152,9 +131,6 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to persist product")
 		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
-		if telemetry.AppMetrics != nil {
-			telemetry.AppMetrics.ProcessingErrors.Add(ctx, 1)
-		}
 		return fmt.Errorf("failed to persist product after retries: %w", err)
 	}
 

@@ -1,15 +1,14 @@
 {
-  "dashboard": {
-    "title": "Distributed Tracing - ClickHouse",
-    "uid": "clickhouse-traces",
-    "timezone": "browser",
-    "schemaVersion": 16,
-    "refresh": "1m",
-    "time": {
-      "from": "now-1h",
-      "to": "now"
-    },
-    "panels": [
+  "title": "Distributed Tracing - ClickHouse",
+  "uid": "clickhouse-traces",
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "refresh": "1m",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
       {
         "id": 1,
         "title": "Trace Count by Service",

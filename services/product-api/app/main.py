@@ -11,7 +11,6 @@ from app.services import KafkaProducerService
 from app.middleware.error_injection import ErrorInjectionMiddleware
 from app.middleware.latency_injection import LatencyInjectionMiddleware
 from app.telemetry.tracing import setup_tracing, get_current_trace_id
-from app.telemetry.metrics import app_metrics
 from app.telemetry.prometheus_metrics import metrics_app
 
 
@@ -88,13 +87,6 @@ def create_application() -> FastAPI:
     
     setup_tracing(
         app=app,
-        service_name=settings.app_name,
-        service_version=settings.app_version,
-        environment=settings.environment,
-        otlp_endpoint=settings.otlp_endpoint
-    )
-    
-    app_metrics.setup(
         service_name=settings.app_name,
         service_version=settings.app_version,
         environment=settings.environment,

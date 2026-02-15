@@ -77,24 +77,6 @@ func run(ctx context.Context, cfg *config.Config) error {
 		}()
 	}
 
-	shutdownMetrics, err := telemetry.SetupMetrics(telemetry.MetricsConfig{
-		ServiceName:    "product-consumer",
-		ServiceVersion: "1.0.0",
-		Environment:    cfg.App.Environment,
-		OTLPEndpoint:   cfg.OpenTelemetry.Endpoint,
-	})
-	if err != nil {
-		log.WithError(err).Error("Failed to setup metrics")
-	} else {
-		defer func() {
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := shutdownMetrics(shutdownCtx); err != nil {
-				log.WithError(err).Error("Failed to shutdown metrics")
-			}
-		}()
-	}
-
 	repo, err := repository.NewProductRepository(cfg, log)
 	if err != nil {
 		return err
