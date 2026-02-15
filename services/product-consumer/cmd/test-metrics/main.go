@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,9 +13,28 @@ import (
 
 func main() {
 	metrics.Init()
-	metrics.StartServer("8081")
-	log.Println("Prometheus metrics server started on :8081")
-	log.Println("Test metrics at: http://localhost:8081/metrics")
+
+	// Criar servidor HTTP com /metrics e /health
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.GetHandler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	server := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+
+	go func() {
+		log.Println("HTTP server started on :8081")
+		log.Println("- Metrics: http://localhost:8081/metrics")
+		log.Println("- Health:  http://localhost:8081/health")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
 
 	// Simular algumas métricas
 	go func() {

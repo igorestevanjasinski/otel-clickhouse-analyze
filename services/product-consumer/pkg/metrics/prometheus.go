@@ -58,11 +58,8 @@ func Init() {
 	prometheus.MustRegister(DatabaseOperationDuration)
 }
 
-func StartServer(port string) {
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
-			panic(err)
-		}
-	}()
+// GetHandler retorna o handler HTTP para o endpoint /metrics
+// Para ser usado em um servidor HTTP compartilhado
+func GetHandler() http.Handler {
+	return promhttp.Handler()
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,8 +57,34 @@ func main() {
 
 func run(ctx context.Context, cfg *config.Config) error {
 	metrics.Init()
-	metrics.StartServer("8081")
-	log.Info("Prometheus metrics server started on :8081")
+
+	// Iniciar servidor HTTP para métricas e health check
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.GetHandler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	server := &http.Server{
+		Addr:    ":8081",
+		Handler: mux,
+	}
+
+	go func() {
+		log.Info("HTTP server started on :8081 (metrics at /metrics, health at /health)")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Error("HTTP server failed")
+		}
+	}()
+
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.WithError(err).Error("Failed to shutdown HTTP server")
+		}
+	}()
 
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{
 		ServiceName:    "product-consumer",
