@@ -58,34 +58,6 @@ func main() {
 func run(ctx context.Context, cfg *config.Config) error {
 	metrics.Init()
 
-	// Iniciar servidor HTTP para métricas e health check
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.GetHandler())
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	server := &http.Server{
-		Addr:    ":8081",
-		Handler: mux,
-	}
-
-	go func() {
-		log.Info("HTTP server started on :8081 (metrics at /metrics, health at /health)")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Error("HTTP server failed")
-		}
-	}()
-
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.WithError(err).Error("Failed to shutdown HTTP server")
-		}
-	}()
-
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{
 		ServiceName:    "product-consumer",
 		ServiceVersion: "1.0.0",
@@ -114,6 +86,37 @@ func run(ctx context.Context, cfg *config.Config) error {
 		}
 	}()
 
+	// Criar health checker para endpoints de saúde
+	healthChecker := health.NewHealthChecker(repo, cfg.Kafka.Brokers, log)
+
+	// Atualizar servidor HTTP para incluir health checks completos
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.GetHandler())
+	mux.HandleFunc("/health", healthChecker.HealthHandler)
+	mux.HandleFunc("/ready", healthChecker.ReadyHandler)
+
+	server := &http.Server{
+		Addr:         ":8081",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		log.Info("HTTP server started on :8081 (metrics: /metrics, health: /health, ready: /ready)")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.WithError(err).Error("HTTP server failed")
+		}
+	}()
+
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.WithError(err).Error("Failed to shutdown HTTP server")
+		}
+	}()
+
 	dlqTopic := cfg.Kafka.Topic + "-dlq"
 
 	chaosConfig := &consumer.ChaosConfig{
@@ -136,20 +139,6 @@ func run(ctx context.Context, cfg *config.Config) error {
 	defer func() {
 		if err := handler.Close(); err != nil {
 			log.WithError(err).Error("Failed to close message handler")
-		}
-	}()
-
-	healthServer := health.NewHealthServer(8081, repo, cfg.Kafka.Brokers, log)
-	go func() {
-		if err := healthServer.Start(); err != nil {
-			log.WithError(err).Error("Health server failed")
-		}
-	}()
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := healthServer.Shutdown(shutdownCtx); err != nil {
-			log.WithError(err).Error("Failed to shutdown health server")
 		}
 	}()
 
