@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -12,46 +13,56 @@ import (
 )
 
 func main() {
-	metrics.Init()
+	ctx := context.Background()
+	endpoint := os.Getenv("OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:4317"
+	}
 
-	// Criar servidor HTTP com /metrics e /health
+	shutdown, err := metrics.SetupMetrics(ctx, metrics.MetricsConfig{
+		ServiceName:    "product-consumer",
+		ServiceVersion: "1.0.0",
+		Environment:    "development",
+		OTLPEndpoint:   endpoint,
+	})
+	if err != nil {
+		log.Fatalf("SetupMetrics: %v", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdown(shutdownCtx)
+	}()
+
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.GetHandler())
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	server := &http.Server{
-		Addr:    ":8081",
-		Handler: mux,
-	}
-
+	server := &http.Server{Addr: ":8081", Handler: mux}
 	go func() {
-		log.Println("HTTP server started on :8081")
-		log.Println("- Metrics: http://localhost:8081/metrics")
-		log.Println("- Health:  http://localhost:8081/health")
+		log.Println("HTTP server on :8081 (health: /health); metrics exported via OTLP to", endpoint)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
 
-	// Simular algumas métricas
+	// Simulate metrics (OTLP export)
 	go func() {
 		for {
-			metrics.MessagesConsumed.WithLabelValues("products.events", "success").Inc()
-			metrics.InFlightMessages.Set(5)
-			metrics.ProcessingDuration.WithLabelValues("products.events").Observe(0.123)
-			metrics.DatabaseOperations.WithLabelValues("insert", "success").Inc()
-			metrics.DatabaseOperationDuration.WithLabelValues("insert").Observe(0.015)
+			metrics.RecordMessagesConsumed("products.events", "success", 1)
+			metrics.InFlightAdd(5)
+			metrics.InFlightAdd(-5)
+			metrics.RecordProcessingDuration("products.events", 0.123)
+			metrics.RecordDatabaseOperations("insert", "success", 1)
+			metrics.RecordDatabaseOperationDuration("insert", 0.015)
 			time.Sleep(2 * time.Second)
 		}
 	}()
 
-	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-
 	log.Println("Shutting down...")
 }

@@ -6,6 +6,14 @@ from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION, DEPLOYMENT_ENVIRONMENT
 
 
+def _grpc_endpoint(otlp_endpoint: str) -> str:
+    """Normalize OTLP endpoint to host:port for gRPC (strip scheme and path)."""
+    endpoint = (otlp_endpoint or "").strip().replace("http://", "").replace("https://", "").rstrip("/")
+    if "/" in endpoint:
+        endpoint = endpoint.split("/")[0]
+    return endpoint or "localhost:4317"
+
+
 def setup_logging(service_name: str, service_version: str, environment: str, otlp_endpoint: str):
     """
     Configure OpenTelemetry logging with OTLP exporter.
@@ -14,7 +22,7 @@ def setup_logging(service_name: str, service_version: str, environment: str, otl
         service_name: Name of the service
         service_version: Version of the service
         environment: Deployment environment (dev, staging, prod)
-        otlp_endpoint: OTLP collector endpoint (e.g., http://localhost:4317)
+        otlp_endpoint: OTLP collector endpoint (e.g., http://localhost:4317 or clickstack:4317)
     """
     resource = Resource(attributes={
         SERVICE_NAME: service_name,
@@ -26,9 +34,9 @@ def setup_logging(service_name: str, service_version: str, environment: str, otl
     # Create logger provider
     logger_provider = LoggerProvider(resource=resource)
     
-    # Create OTLP log exporter
+    # Create OTLP log exporter (gRPC expects host:port)
     otlp_exporter = OTLPLogExporter(
-        endpoint=otlp_endpoint,
+        endpoint=_grpc_endpoint(otlp_endpoint),
         insecure=True
     )
     

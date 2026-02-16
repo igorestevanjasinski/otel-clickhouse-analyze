@@ -2,7 +2,10 @@ package telemetry
 
 import (
 	"context"
+	"strings"
 
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/bridges/otellogrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/log/global"
@@ -13,6 +16,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+func grpcEndpointForLog(endpoint string) string {
+	s := strings.TrimSpace(endpoint)
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimSuffix(s, "/")
+	if idx := strings.Index(s, "/"); idx > 0 {
+		s = s[:idx]
+	}
+	if s == "" {
+		return "localhost:4317"
+	}
+	return s
+}
+
 type LoggingConfig struct {
 	ServiceName    string
 	ServiceVersion string
@@ -22,9 +39,10 @@ type LoggingConfig struct {
 
 func SetupLogging(config LoggingConfig) (func(context.Context) error, error) {
 	ctx := context.Background()
+	endpoint := grpcEndpointForLog(config.OTLPEndpoint)
 
 	// Create gRPC connection to OTLP collector
-	conn, err := grpc.DialContext(ctx, config.OTLPEndpoint,
+	conn, err := grpc.DialContext(ctx, endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -58,8 +76,9 @@ func SetupLogging(config LoggingConfig) (func(context.Context) error, error) {
 		log.WithProcessor(processor),
 	)
 
-	// Set global logger provider
+	// Set global logger provider and keep reference for AddLogrusHook
 	global.SetLoggerProvider(loggerProvider)
+	otelLoggerProvider = loggerProvider
 
 	// Return shutdown function
 	return func(ctx context.Context) error {
@@ -68,4 +87,19 @@ func SetupLogging(config LoggingConfig) (func(context.Context) error, error) {
 		}
 		return conn.Close()
 	}, nil
+}
+
+// otelLoggerProvider holds the provider set by SetupLogging so AddLogrusHook can use it.
+var otelLoggerProvider *log.LoggerProvider
+
+// AddLogrusHook attaches an OTLP hook to the given logrus logger so that all
+// logrus entries are also exported as OTLP log records (e.g. to ClickStack).
+// Call after SetupLogging. Returns the hook or nil if SetupLogging was not run.
+func AddLogrusHook(logger *logrus.Logger, serviceName string) *otellogrus.Hook {
+	if otelLoggerProvider == nil {
+		return nil
+	}
+	hook := otellogrus.NewHook(serviceName, otellogrus.WithLoggerProvider(otelLoggerProvider))
+	logger.AddHook(hook)
+	return hook
 }

@@ -105,12 +105,12 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	duration := time.Since(start)
 
-	metrics.DatabaseOperationDuration.WithLabelValues("insert").Observe(duration.Seconds())
+	metrics.RecordDatabaseOperationDuration("insert", duration.Seconds())
 
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to insert product")
-		metrics.DatabaseOperations.WithLabelValues("insert", "error").Inc()
+		metrics.RecordDatabaseOperations("insert", "error", 1)
 		r.log.WithFields(logrus.Fields{
 			"product_id": product.ID,
 			"error":      err.Error(),
@@ -123,7 +123,7 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	if rowsAffected == 0 {
 		span.AddEvent("Product already exists")
-		metrics.DatabaseOperations.WithLabelValues("insert", "duplicate").Inc()
+		metrics.RecordDatabaseOperations("insert", "duplicate", 1)
 		r.log.WithFields(logrus.Fields{
 			"product_id": product.ID,
 			"duration":   duration.Milliseconds(),
@@ -133,7 +133,7 @@ func (r *productRepository) CreateProduct(ctx context.Context, product *models.P
 
 	span.SetStatus(codes.Ok, "Product created successfully")
 	span.SetAttributes(attribute.Int64("db.rows_affected", rowsAffected))
-	metrics.DatabaseOperations.WithLabelValues("insert", "success").Inc()
+	metrics.RecordDatabaseOperations("insert", "success", 1)
 
 	r.log.WithFields(logrus.Fields{
 		"product_id":   product.ID,

@@ -47,11 +47,11 @@ service:
       processors: [resource, batch]
       exporters: [debug, clickhouse]
     
-    #metrics:
-    #  receivers: [otlp]
-    #  processors: [resource, batch]
-    #  exporters: [debug]
-    
+    metrics:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [debug, clickhouse]
+
     logs:
       receivers: [otlp]
       processors: [resource, batch]

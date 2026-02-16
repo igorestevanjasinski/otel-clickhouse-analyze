@@ -12,7 +12,7 @@ from app.middleware.error_injection import ErrorInjectionMiddleware
 from app.middleware.latency_injection import LatencyInjectionMiddleware
 from app.telemetry.tracing import setup_tracing, get_current_trace_id
 from app.telemetry.logging import setup_logging as setup_otel_logging
-from app.telemetry.prometheus_metrics import metrics_app
+from app.telemetry import otel_metrics
 
 
 def setup_logging() -> None:
@@ -101,7 +101,13 @@ def create_application() -> FastAPI:
         environment=settings.environment,
         otlp_endpoint=settings.otlp_endpoint
     )
-    
+    otel_metrics.setup_metrics(
+        service_name=settings.app_name,
+        service_version=settings.app_version,
+        environment=settings.environment,
+        otlp_endpoint=settings.otlp_endpoint,
+    )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -131,9 +137,7 @@ def create_application() -> FastAPI:
         )
     
     app.include_router(products_router, tags=["products"])
-    
-    app.mount("/metrics", metrics_app)
-    
+
     return app
 
 

@@ -37,7 +37,7 @@ SUCCESSES=0
 FAILURES=0
 TOTAL_LATENCY=0
 
-for i in {1..20}; do
+for i in {1..100}; do
   echo -n "Request $i: "
   START=$(date +%s%3N)
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8000/products \

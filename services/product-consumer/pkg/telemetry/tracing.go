@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"log"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -16,7 +17,23 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var tracer trace.Tracer
+// tracer: inicia com no-op; após SetupTracing com sucesso passa a exportar para OTLP
+var tracer trace.Tracer = otel.Tracer("product-consumer")
+
+// grpcEndpoint normaliza o endpoint para host:port (gRPC não usa scheme).
+func grpcEndpoint(endpoint string) string {
+	s := strings.TrimSpace(endpoint)
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimSuffix(s, "/")
+	if idx := strings.Index(s, "/"); idx > 0 {
+		s = s[:idx]
+	}
+	if s == "" {
+		return "localhost:4317"
+	}
+	return s
+}
 
 type TracingConfig struct {
 	ServiceName    string
@@ -27,8 +44,9 @@ type TracingConfig struct {
 
 func SetupTracing(config TracingConfig) (func(context.Context) error, error) {
 	ctx := context.Background()
+	endpoint := grpcEndpoint(config.OTLPEndpoint)
 
-	conn, err := grpc.DialContext(ctx, config.OTLPEndpoint,
+	conn, err := grpc.DialContext(ctx, endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -66,7 +84,7 @@ func SetupTracing(config TracingConfig) (func(context.Context) error, error) {
 	tracer = otel.Tracer(config.ServiceName)
 
 	log.Printf("OpenTelemetry tracing initialized: service=%s endpoint=%s",
-		config.ServiceName, config.OTLPEndpoint)
+		config.ServiceName, endpoint)
 
 	return tracerProvider.Shutdown, nil
 }

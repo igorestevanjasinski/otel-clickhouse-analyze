@@ -1,6 +1,6 @@
 # Microservices Observability Portfolio
 
-Platform de observabilidade demonstrando práticas modernas com OpenTelemetry, ClickHouse, Prometheus, Grafana e SRE practices.
+Platform de observabilidade demonstrando práticas modernas com OpenTelemetry, ClickStack (ClickHouse + HyperDX) e SRE practices.
 
 ## Arquitetura
 
@@ -22,8 +22,8 @@ Platform de observabilidade demonstrando práticas modernas com OpenTelemetry, C
 - **Consumer**: Golang + kafka-go + pgx
 - **Message Broker**: Apache Kafka (Confluent)
 - **Database**: PostgreSQL 15
-- **Observability**: OpenTelemetry, Prometheus, Grafana
-- **Storage**: ClickHouse (traces/logs)
+- **Observability**: OpenTelemetry (OTLP) → ClickStack All-in-One (collector + ClickHouse + HyperDX UI)
+- **Métricas, logs e traces** armazenados no ClickHouse do ClickStack; UI em http://localhost:8080
 
 ## Quick Start
 
@@ -47,6 +47,14 @@ curl -X POST http://localhost:8000/products \
 docker compose exec postgres psql -U postgres -d products_db \
   -c "SELECT * FROM products ORDER BY created_at DESC LIMIT 1;"
 ```
+
+## Observabilidade (ClickStack)
+
+- **UI HyperDX:** http://localhost:8080  
+  No modo Local não é necessário criar usuário (autenticação desabilitada); os datasources do ClickHouse integrado já vêm configurados.
+- **Telemetria:** Product API e Product Consumer enviam traces, logs e métricas via OTLP (gRPC) para o ClickStack na porta 4317. O collector persiste no schema nativo (otel_logs, otel_traces, otel_metrics_*).
+- **Imagem:** Usamos `clickhouse/clickstack-local` (autenticação desabilitada no OTLP). Se usar `clickstack-all-in-one`, o receiver exige API key e retorna `UNAUTHENTICATED`; para dev local, use `clickstack-local`.
+- **Primeira subida:** O container ClickStack leva ~1–2 minutos para ficar pronto. O compose espera o healthcheck (porta 4317) antes de subir a product-api e o product-consumer.
 
 ## Health Checks
 
@@ -221,7 +229,7 @@ go test ./... -v
 - ✅ Fase 6: Complete Kafka Consumer
 - ✅ Fase 7: Chaos Engineering
 - ⏳ Fase 8: Testing & Documentation
-- ⏳ Fase 9-12: OpenTelemetry, ClickHouse, Prometheus, Grafana
+- ✅ Fase 9-12: OpenTelemetry, ClickStack (ClickHouse + HyperDX), métricas OTLP
 
 ## License
 

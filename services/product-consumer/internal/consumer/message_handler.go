@@ -77,13 +77,12 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		"trace_id":       traceID,
 	})
 
-	metrics.InFlightMessages.Inc()
-	defer metrics.InFlightMessages.Dec()
+	metrics.InFlightAdd(1)
+	defer metrics.InFlightAdd(-1)
 
 	start := time.Now()
 	defer func() {
-		duration := time.Since(start).Seconds()
-		metrics.ProcessingDuration.WithLabelValues(msg.Topic).Observe(duration)
+		metrics.RecordProcessingDuration(msg.Topic, time.Since(start).Seconds())
 	}()
 
 	InjectLatency(h.chaosConfig)
@@ -92,7 +91,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Chaos error injected")
 		log.WithError(err).Error("Chaos error injected, skipping message processing")
-		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
+		metrics.RecordMessagesConsumed(msg.Topic, "error", 1)
 		return err
 	}
 
@@ -102,7 +101,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.SetStatus(codes.Error, "Deserialization failed")
 		log.WithError(err).Error("Failed to deserialize message")
 		h.handleDeserializationError(ctx, msg, correlationID)
-		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
+		metrics.RecordMessagesConsumed(msg.Topic, "error", 1)
 		return nil
 	}
 
@@ -111,7 +110,7 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 		span.SetStatus(codes.Error, "Validation failed")
 		log.WithError(err).Error("Invalid product data")
 		h.handleDeserializationError(ctx, msg, correlationID)
-		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
+		metrics.RecordMessagesConsumed(msg.Topic, "error", 1)
 		return nil
 	}
 
@@ -130,13 +129,13 @@ func (h *MessageHandler) ProcessMessage(ctx context.Context, msg kafka.Message) 
 	if err := h.createProductWithRetry(ctx, &product, log); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to persist product")
-		metrics.MessagesConsumed.WithLabelValues(msg.Topic, "error").Inc()
+		metrics.RecordMessagesConsumed(msg.Topic, "error", 1)
 		return fmt.Errorf("failed to persist product after retries: %w", err)
 	}
 
 	span.SetStatus(codes.Ok, "Product persisted successfully")
 	log.WithField("product_id", product.ID).Info("Product persisted successfully")
-	metrics.MessagesConsumed.WithLabelValues(msg.Topic, "success").Inc()
+	metrics.RecordMessagesConsumed(msg.Topic, "success", 1)
 	return nil
 }
 

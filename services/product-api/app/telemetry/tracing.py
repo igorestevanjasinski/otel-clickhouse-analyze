@@ -11,6 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _grpc_endpoint(otlp_endpoint: str) -> str:
+    """Normalize OTLP endpoint to host:port for gRPC (strip scheme and path)."""
+    endpoint = (otlp_endpoint or "").strip().replace("http://", "").replace("https://", "").rstrip("/")
+    if "/" in endpoint:
+        endpoint = endpoint.split("/")[0]
+    return endpoint or "localhost:4317"
+
+
 def setup_tracing(app: FastAPI, service_name: str, service_version: str, environment: str, otlp_endpoint: str):
     """
     Configure OpenTelemetry tracing with OTLP exporter.
@@ -20,7 +28,7 @@ def setup_tracing(app: FastAPI, service_name: str, service_version: str, environ
         service_name: Name of the service
         service_version: Version of the service
         environment: Deployment environment (dev, staging, prod)
-        otlp_endpoint: OTLP collector endpoint (e.g., http://localhost:4317)
+        otlp_endpoint: OTLP collector endpoint (e.g., http://localhost:4317 or clickstack:4317)
     """
     resource = Resource(attributes={
         SERVICE_NAME: service_name,
@@ -32,7 +40,7 @@ def setup_tracing(app: FastAPI, service_name: str, service_version: str, environ
     provider = TracerProvider(resource=resource)
     
     otlp_exporter = OTLPSpanExporter(
-        endpoint=otlp_endpoint,
+        endpoint=_grpc_endpoint(otlp_endpoint),
         insecure=True
     )
     

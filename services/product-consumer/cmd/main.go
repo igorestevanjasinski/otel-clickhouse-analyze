@@ -56,12 +56,28 @@ func main() {
 }
 
 func run(ctx context.Context, cfg *config.Config) error {
-	metrics.Init()
+	// OpenTelemetry metrics (OTLP export; no /metrics endpoint)
+	shutdownMetrics, metricsErr := metrics.SetupMetrics(ctx, metrics.MetricsConfig{
+		ServiceName:    "product-consumer",
+		ServiceVersion: "1.0.0",
+		Environment:    cfg.App.Environment,
+		OTLPEndpoint:   cfg.OpenTelemetry.Endpoint,
+	})
+	if metricsErr != nil {
+		log.WithError(metricsErr).Warn("Failed to setup metrics, continuing without OTLP metrics export")
+	} else {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownMetrics(shutdownCtx); err != nil {
+				log.WithError(err).Error("Failed to shutdown metrics")
+			}
+		}()
+		log.Info("OpenTelemetry metrics initialized")
+	}
 
-	// Criar servidor HTTP primeiro para garantir que endpoints estejam disponíveis
-	// mesmo se houver problemas com dependências (Kafka/PostgreSQL)
+	// HTTP server for health/ready (no Prometheus /metrics)
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.GetHandler())
 
 	// Health check simples que sempre responde
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +94,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 	}
 
 	go func() {
-		log.Info("HTTP server started on :8081 (metrics: /metrics, health: /health, ready: /ready)")
+		log.Info("HTTP server started on :8081 (health: /health, ready: /ready)")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.WithError(err).Error("HTTP server failed")
 		}
@@ -109,7 +125,12 @@ func run(ctx context.Context, cfg *config.Config) error {
 				log.WithError(err).Error("Failed to shutdown logging")
 			}
 		}()
-		log.Info("OpenTelemetry logging initialized")
+		// Bridge logrus → OTLP: todos os logs logrus passam também para o ClickStack
+		if hook := telemetry.AddLogrusHook(log, "product-consumer"); hook != nil {
+			log.Info("OpenTelemetry logging initialized (logrus → OTLP)")
+		} else {
+			log.Info("OpenTelemetry logging initialized")
+		}
 	}
 
 	shutdownTracing, err := telemetry.SetupTracing(telemetry.TracingConfig{

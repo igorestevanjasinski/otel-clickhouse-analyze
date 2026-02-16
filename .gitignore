@@ -48,6 +48,8 @@ clickhouse_data/
 postgres_data/
 prometheus_data/
 grafana_data/
+clickstack_data/
+clickstack_mongo/
 
 # IDE
 .vscode/
